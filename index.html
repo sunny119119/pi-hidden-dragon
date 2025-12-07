@@ -63,19 +63,43 @@
         const Pi = window.Pi;
         
         // 1. 手动触发登录函数
+               // --- 调试版登录函数 (开始) ---
         async function startPiLogin() {
             const status = document.getElementById('status-text');
+            
+            // 【第一步】弹窗显示当前真实网址
+            // Pi SDK 要求后台配置的 URL 必须和下面弹出的这个一模一样！
+            const currentUrl = window.location.href;
+            alert("🔍 正在诊断...\n\n浏览器当前的真实网址是：\n" + currentUrl + "\n\n请检查：Pi后台填写的URL必须和上面这个完全一致(包括末尾斜杠)！");
+
             try {
                 status.innerText = "正在初始化 SDK...";
                 Pi.init({ version: "2.0", sandbox: true });
                 
-                status.innerText = "等待授权...";
+                status.innerText = "正在呼叫 Pi 钱包...";
                 const scopes = ['username', 'payments'];
+                
+                // 开始认证
                 const auth = await Pi.authenticate(scopes, onIncompletePaymentFound);
                 
+                // 如果成功
                 status.innerText = "登录成功！";
                 document.getElementById('username-display').innerText = `道友 @${auth.user.username}`;
                 
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    init();
+                    showMessage(`欢迎 @${auth.user.username}`, "#f1c40f");
+                }, 500);
+
+            } catch (err) {
+                console.error(err);
+                status.innerText = "错误: " + err;
+                // 如果报错，也会弹窗提示具体原因
+                alert("❌ 登录失败！错误信息：\n" + err);
+            }
+        }
+        // --- 调试版登录函数 (结束) ---
                 // 登录成功后进入游戏
                 setTimeout(() => {
                     document.getElementById('loading-overlay').style.display = 'none';
@@ -165,3 +189,4 @@
     </script>
 </body>
 </html>
+
