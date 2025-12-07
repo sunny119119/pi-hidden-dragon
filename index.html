@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pi · 乾坤龙藏</title>
+    <style>
+        body {
+            background-color: #0c0c0c; /* 玄色背景 */
+            color: #dcdde1;
+            font-family: 'Microsoft YaHei', 'KaiTi', serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 八卦背景装饰 */
+        .bagua-bg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 300px;
+            color: rgba(50, 50, 50, 0.1);
+            z-index: -1;
+            pointer-events: none;
+            animation: spin 60s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        #top-bar {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            z-index: 10;
+        }
+
+        #header {
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+
+        #lang-btn {
+            background: transparent;
+            border: 1px solid #7f8c8d;
+            color: #bdc3c7;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        /* 状态栏：包含本命五行 */
+        #ui-bar {
+            width: 90%;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .stat-val {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 2px;
+            color: #fff;
+        }
+
+        #destiny-box {
+            border: 1px solid #f1c40f;
+            padding: 5px 10px;
+            border-radius: 4px;
+            color: #f1c40f;
+            text-align: center;
+        }
+
+        #game-canvas {
+            margin-top: 20px;
+            background-color: #000;
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            touch-action: none;
+        }
+
+        #message-box {
+            position: absolute;
+            bottom: 80px;
+            width: 80%;
+            text-align: center;
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid #fff;
+            padding: 12px;
+            display: none;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+            z-index: 20;
+            animation: fadeIn 0.3s;
+        }
+
+        /* 五行颜色类 */
+        .color-gold { color: #f1c40f; } /* 金 */
+        .color-wood { color: #2ecc71; } /* 木 */
+        .color-water { color: #3498db; } /* 水 */
+        .color-fire { color: #e74c3c; } /* 火 */
+        .color-earth { color: #e67e22; } /* 土 */
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <!-- 背景太极图 -->
+    <div class="bagua-bg">☯</div>
+
+    <div id="top-bar">
+        <div id="header">乾坤 · 龙藏</div>
+        <button id="lang-btn" onclick="toggleLanguage()">🌐 中/EN</button>
+    </div>
+
+    <div id="ui-bar">
+        <div class="stat-item">
+            <span>气 (Chi)</span>
+            <span class="stat-val" id="energy">10</span>
+        </div>
+        
+        <!-- 本命五行显示 -->
+        <div id="destiny-box" onclick="rerollDestiny()">
+            <div style="font-size:10px;">本命 (Destiny)</div>
+            <div id="my-element" style="font-size:18px;">🔥 火</div>
+        </div>
+
+        <div class="stat-item">
+            <span>Pi (Treasure)</span>
+            <span class="stat-val" id="balance" style="color:#f1c40f">0.00</span>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="message-box"></div>
+
+    <div id="controls">点击探索 · 五行生克</div>
+
+    <script>
+        // --- 1. 五行系统 (Wu Xing Logic) ---
+        const WUXING = {
+            'Metal': { name: '金', color: '#f1c40f', icon: '⚪' }, // 金 - Gold
+            'Wood':  { name: '木', color: '#2ecc71', icon: '🌲' }, // 木 - Green
+            'Water': { name: '水', color: '#3498db', icon: '💧' }, // 水 - Blue
+            'Fire':  { name: '火', color: '#e74c3c', icon: '🔥' }, // 火 - Red
+            'Earth': { name: '土', color: '#d35400', icon: '⛰️' }  // 土 - Brown
+        };
+
+        const ELEMENTS = ['Metal', 'Wood', 'Water', 'Fire', 'Earth'];
+
+        // 相生：金生水，水生木，木生火，火生土，土生金
+        const GENERATES = { 'Metal':'Water', 'Water':'Wood', 'Wood':'Fire', 'Fire':'Earth', 'Earth':'Metal' };
+        
+        // 相克：金克木，木克土，土克水，水克火，火克金
+        const DESTROYS = { 'Metal':'Wood', 'Wood':'Earth', 'Earth':'Water', 'Water':'Fire', 'Fire':'Metal' };
+
+        // --- 2. 语言包 ---
+        const LANG = {
+            zh: {
+                title: "乾坤 · 龙藏",
+                energy: "气",
+                balance: "宝藏",
+                my_element: "本命",
+                controls: "五行流转 · 生生不息",
+                msg_harmony: "【相生】气运加身！能量 +1",
+                msg_clash: "【相克】元气受损！能量 -2",
+                msg_scale: "【吉兆】发现龙鳞 (火)！+0.5 Pi",
+                msg_eye: "【天命】点亮龙眼！+5.0 Pi",
+                msg_empty: "此处是一片",
+                element_names: {'Metal':'金地', 'Wood':'林地', 'Water':'水泽', 'Fire':'焦土', 'Earth':'荒原'}
+            },
+            en: {
+                title: "Pi: The Hidden",
+                energy: "Chi",
+                balance: "Pi",
+                my_element: "Destiny",
+                controls: "Cycles of Creation and Destruction",
+                msg_harmony: "[Harmony] Energy Gained! +1 Chi",
+                msg_clash: "[Clash] Energy Lost! -2 Chi",
+                msg_scale: "[Omen] Dragon Scale (Fire) found! +0.5 Pi",
+                msg_eye: "[Jackpot] Dragon Eye Revealed! +5.0 Pi",
+                msg_empty: "You found ",
+                element_names: {'Metal':'Metal Ore', 'Wood':'Forest', 'Water':'Lake', 'Fire':'Ash', 'Earth':'Barren Land'}
+            }
+        };
+
+        // --- 3. 游戏配置 ---
+        // 12x12 龙图设计 (1=Scale/Fire, 2=Eye/Metal, 0=Random Element)
+        const DRAGON_MAP = [
+            [0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,0,0,0,0,0,0,1,0,0],
+            [0,0,1,1,0,0,0,0,1,1,0,0],
+            [0,1,1,1,1,1,1,1,1,1,1,0],
+            [0,1,1,2,1,1,1,1,2,1,1,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,0,0,1,1,1,1,0,0,1,1],
+            [0,1,1,1,1,0,0,1,1,1,1,0],
+            [0,0,1,1,1,0,0,1,1,1,0,0],
+            [0,0,1,0,1,0,0,1,0,1,0,0],
+            [0,0,1,0,0,0,0,0,0,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0]
+        ];
+
+        const CONFIG = {
+            gridSize: 12,
+            gap: 1,
+            bg: '#111'
+        };
+
+        let state = {
+            energy: 15, // 初始能量给多点
+            balance: 0.00,
+            myElement: 'Metal', // 初始本命
+            mapData: []
+        };
+
+        let currentLang = 'zh';
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const msgBox = document.getElementById('message-box');
+        
+        // --- Audio Context (简易音效) ---
+        const AudioSys = {
+            ctx: null,
+            init: function() {
+                if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if(this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            beep: function(freq, type, dur) {
+                if(!this.ctx) this.init();
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.type = type; o.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                o.connect(g); g.connect(this.ctx.destination);
+                o.start(); o.stop(this.ctx.currentTime + dur);
+            }
+        };
+
+        // --- 初始化 ---
+        function init() {
+            const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
+            canvas.width = size;
+            canvas.height = size;
+            CONFIG.tileSize = (size - (CONFIG.gridSize + 1) * CONFIG.gap) / CONFIG.gridSize;
+
+            rerollDestiny(); // 随机一个本命
+
+            // 生成地图数据
+            for (let r = 0; r < CONFIG.gridSize; r++) {
+                let row = [];
+                for (let c = 0; c < CONFIG.gridSize; c++) {
+                    const design = DRAGON_MAP[r][c];
+                    let type = 'empty';
+                    let element = ELEMENTS[Math.floor(Math.random() * 5)]; // 随机五行
+
+                    if (design === 1) { 
+                        type = 'scale'; 
+                        element = 'Fire'; // 龙鳞固定为火
+                    } else if (design === 2) { 
+                        type = 'eye'; 
+                        element = 'Metal'; // 龙眼固定为金
+                    }
+
+                    row.push({ explored: false, type: type, element: element });
+                }
+                state.mapData.push(row);
+            }
+
+            updateUI();
+            drawMap();
+            canvas.addEventListener('click', handleInput);
+            document.body.addEventListener('click', () => AudioSys.init(), {once:true});
+        }
+
+        // --- 核心逻辑：五行生克 ---
+        function handleInput(e) {
+            const rect = canvas.getBoundingClientRect();
+            const col = Math.floor((e.clientX - rect.left) / (CONFIG.tileSize + CONFIG.gap));
+            const row = Math.floor((e.clientY - rect.top) / (CONFIG.tileSize + CONFIG.gap));
+            
+            if (col < 0 || col >= CONFIG.gridSize || row < 0 || row >= CONFIG.gridSize) return;
+            
+            const cell = state.mapData[row][col];
+            if (cell.explored) return;
+
+            if (state.energy <= 0) {
+                showMessage(currentLang==='zh'?"气数已尽，请等待。":"Low Chi. Please wait.", '#7f8c8d');
+                return;
+            }
+
+            // 1. 基础扣除
+            let energyCost = 1;
+            let feedback = "";
+            let color = "#fff";
+
+            // 2. 判定五行关系 (Tile vs Player)
+            const tileEl = cell.element;
+            const myEl = state.myElement;
+            const t = LANG[currentLang];
+
+            // 关系逻辑
+            if (GENERATES[tileEl] === myEl) {
+                // 生我者为父母 -> 补气 (Tile generates Player)
+                // 例：地块是水，我是木 -> 水生木 -> 获得能量
+                state.energy += 1; // 实际上不扣反而加 (扣1加2)
+                feedback = t.msg_harmony + `<br>(${WUXING[tileEl].name} ➞ ${WUXING[myEl].name})`;
+                color = "#2ecc71"; // Green
+                AudioSys.beep(600, 'sine', 0.3);
+            } 
+            else if (DESTROYS[tileEl] === myEl) {
+                // 克我者为官鬼 -> 损气 (Tile destroys Player)
+                // 例：地块是金，我是木 -> 金克木 -> 额外扣除
+                state.energy -= 1; // 额外扣1
+                feedback = t.msg_clash + `<br>(${WUXING[tileEl].name} ⚔️ ${WUXING[myEl].name})`;
+                color = "#e74c3c"; // Red
+                AudioSys.beep(150, 'sawtooth', 0.4);
+            }
+            else if (GENERATES[myEl] === tileEl) {
+                // 我生者为子孙 -> 消耗小 (Player generates Tile)
+                feedback = currentLang==='zh' ? "【泄气】付出能量。" : "Chi drained.";
+                color = "#aaa";
+                AudioSys.beep(300, 'triangle', 0.1);
+            }
+            else if (DESTROYS[myEl] === tileEl) {
+                // 我克者为妻财 -> 获得财富? (暂且普通处理)
+                feedback = currentLang==='zh' ? "【掌控】五行平稳。" : "Controlled.";
+                AudioSys.beep(400, 'triangle', 0.1);
+            }
+            else {
+                 // 同气连枝
+                 feedback = currentLang==='zh' ? "【比和】气息平稳。" : "Neutral.";
+                 AudioSys.beep(400, 'sine', 0.1);
+            }
+
+            state.energy -= energyCost;
+            cell.explored = true;
+
+            // 3. 判定物品
+            if (cell.type === 'scale') {
+                state.balance += 0.5;
+                feedback = t.msg_scale; // 覆盖生克信息，显示更重要的
+                color = "#f1c40f";
+                AudioSys.beep(880, 'square', 0.2);
+            } else if (cell.type === 'eye') {
+                state.balance += 5.0;
+                feedback = t.msg_eye;
+                color = "#00b894";
+                AudioSys.beep(1200, 'square', 0.5);
+            } else {
+                // 如果没有宝藏，显示生克结果 + 地块名字
+                let elName = t.element_names[tileEl];
+                feedback = feedback + `<br>${t.msg_empty} ${WUXING[tileEl].icon} ${elName}`;
+            }
+
+            showMessage(feedback, color, 3000);
+            updateUI();
+            drawMap();
+
+            // 每次点击后，本命有小概率改变（无常）
+            if(Math.random() > 0.85) {
+                setTimeout(rerollDestiny, 1000);
+            }
+        }
+
+        function rerollDestiny() {
+            const keys = Object.keys(WUXING);
+            state.myElement = keys[Math.floor(Math.random() * keys.length)];
+            updateUI();
+            // 简单的震动提示变卦了
+            if(navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        }
+
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let r = 0; r < CONFIG.gridSize; r++) {
+                for (let c = 0; c < CONFIG.gridSize; c++) {
+                    const x = c * (CONFIG.tileSize + CONFIG.gap);
+                    const y = r * (CONFIG.tileSize + CONFIG.gap);
+                    const cell = state.mapData[r][c];
+
+                    if (!cell.explored) {
+                        ctx.fillStyle = '#222';
+                        ctx.fillRect(x, y, CONFIG.tileSize, CONFIG.tileSize);
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x,y,CONFIG.tileSize,CONFIG.tileSize);
+                    } else {
+                        // 显示五行颜色背景
+                        const elData = WUXING[cell.element];
+                        ctx.fillStyle = elData.color;
+                        ctx.globalAlpha = 0.8; // 稍微暗一点作为底色
+                        ctx.fillRect(x, y, CONFIG.tileSize, CONFIG.tileSize);
+                        ctx.globalAlpha = 1.0;
+
+                        // 绘制内容图标
+                        ctx.font = '14px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        
+                        if (cell.type === 'scale') {
+                            // 龙鳞覆盖五行
+                            ctx.fillStyle = '#c0392b';
+                            ctx.fillRect(x, y, CONFIG.tileSize, CONFIG.tileSize);
+                            ctx.fillStyle = 'gold';
+                            ctx.fillText('🐲', x + CONFIG.tileSize/2, y + CONFIG.tileSize/2);
+                        } else if (cell.type === 'eye') {
+                            ctx.fillStyle = '#16a085';
+                            ctx.fillRect(x, y, CONFIG.tileSize, CONFIG.tileSize);
+                            ctx.fillStyle = 'white';
+                            ctx.fillText('👁️', x + CONFIG.tileSize/2, y + CONFIG.tileSize/2);
+                        } else {
+                            // 普通地块显示五行符号
+                            ctx.fillStyle = '#000';
+                            ctx.font = '10px Arial';
+                            ctx.fillText(elData.name, x + CONFIG.tileSize/2, y + CONFIG.tileSize/2);
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateUI() {
+            const myEl = WUXING[state.myElement];
+            const elBox = document.getElementById('destiny-box');
+            document.getElementById('my-element').innerText = `${myEl.icon} ${myEl.name}`;
+            elBox.style.borderColor = myEl.color;
+            elBox.style.color = myEl.color;
+            
+            document.getElementById('energy').innerText = state.energy;
+            document.getElementById('balance').innerText = state.balance.toFixed(2);
+            
+            const t = LANG[currentLang];
+            document.getElementById('header').innerText = t.title;
+        }
+
+        function toggleLanguage() {
+            currentLang = (currentLang === 'zh') ? 'en' : 'zh';
+            updateUI();
+        }
+
+        let msgTimeout;
+        function showMessage(html, color, dur=3000) {
+            msgBox.innerHTML = html;
+            msgBox.style.borderColor = color;
+            msgBox.style.display = 'block';
+            if(msgTimeout) clearTimeout(msgTimeout);
+            msgTimeout = setTimeout(()=>msgBox.style.display='none', dur);
+        }
+
+        init();
+    </script>
+</body>
+</html>
