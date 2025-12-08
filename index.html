@@ -1,67 +1,604 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pi · 乾坤龙藏</title>
-    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Pi · 乾坤龙藏（单机版）</title>
     <style>
-        body { background-color: #0c0c0c; color: #dcdde1; font-family: 'Microsoft YaHei', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; user-select: none; }
-        #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 999; display: flex; justify-content: center; align-items: center; flex-direction: column; color: #f1c40f; }
-        .btn-pi { border: 1px solid #f1c40f; background: #f1c40f; color: #000; padding: 12px 30px; font-size: 18px; border-radius: 8px; font-weight: bold; margin: 10px; cursor: pointer; }
-        .btn-skip { border: 1px solid #555; background: transparent; color: #888; padding: 8px 20px; font-size: 14px; border-radius: 8px; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div id="loading-overlay">
-        <div style="font-size: 24px; margin-bottom:20px;">乾坤 · 龙藏</div>
-        <div id="status-text" style="color:#aaa; margin-bottom:20px;">准备就绪</div>
-        <button class="btn-pi" onclick="startPiLogin()">Login with Pi (诊断)</button>
-        <button class="btn-skip" onclick="skipLogin()">跳过登录</button>
-    </div>
+        body {
+            background-color: #0c0c0c;
+            color: #dcdde1;
+            font-family: "Microsoft YaHei", sans-serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
 
-    <!-- 简化的游戏结构用于测试 -->
-    <div style="display:none;" id="game-container">
-        <h2 style="margin-top:50px;">游戏已启动</h2>
-        <div id="username-display"></div>
-    </div>
+        /* 覆盖层：开始游戏 */
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #f1c40f;
+        }
 
-    <script>
-        const Pi = window.Pi;
+        #start-overlay h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
 
-        async function startPiLogin() {
-            const status = document.getElementById('status-text');
-            
-            // 【关键】获取当前浏览器地址栏里的真实网址
-            const realUrl = window.location.href;
-            
-            // 【弹窗】直接把网址显示出来
-            alert("🔴 请截图或抄下这个网址：\n\n" + realUrl + "\n\n去 Pi 后台(Configuration)，把 App URL 改成和上面完全一样！");
-            
-            try {
-                status.innerText = "正在初始化...";
-                Pi.init({ version: "2.0", sandbox: true });
-                
-                status.innerText = "请求授权中 (无支付)...";
-                // 只请求用户名，避开钱包问题
-                const auth = await Pi.authenticate(['username'], onIncompletePaymentFound);
-                
-                alert("✅ 成功！登录用户: " + auth.user.username);
-                document.getElementById('loading-overlay').style.display = 'none';
-                document.getElementById('game-container').style.display = 'block';
-                document.getElementById('username-display').innerText = "欢迎 " + auth.user.username;
+        .btn-start {
+            border: 1px solid #f1c40f;
+            background: #f1c40f;
+            color: #000;
+            padding: 10px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        }
 
-            } catch (err) {
-                console.error(err);
-                status.innerText = "失败: " + err;
-                alert("❌ 依然失败。\n请确认 Pi 后台填的网址是否和刚才弹窗里的一模一样？\n错误信息: " + err);
+        .btn-start-sub {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* 背景八卦 */
+        .bagua-bg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 300px;
+            color: rgba(50, 50, 50, 0.12);
+            z-index: -1;
+            pointer-events: none;
+            animation: spin 60s linear infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: translate(-50%, -50%) rotate(360deg);
             }
         }
 
-        function onIncompletePaymentFound(payment) {}
-        function skipLogin() {
-            document.getElementById('loading-overlay').style.display = 'none';
-            document.getElementById('game-container').style.display = 'block';
+        #top-bar {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            z-index: 10;
+        }
+
+        #header {
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+
+        #lang-btn {
+            background: transparent;
+            border: 1px solid #7f8c8d;
+            color: #bdc3c7;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        #ui-bar {
+            width: 90%;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .stat-val {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 2px;
+            color: #fff;
+        }
+
+        #destiny-box {
+            border: 1px solid #f1c40f;
+            padding: 5px 10px;
+            border-radius: 4px;
+            color: #f1c40f;
+            text-align: center;
+        }
+
+        #game-canvas {
+            margin-top: 20px;
+            background-color: #000;
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            touch-action: none;
+        }
+
+        #message-box {
+            position: absolute;
+            bottom: 80px;
+            width: 80%;
+            text-align: center;
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid #fff;
+            padding: 12px;
+            display: none;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+            z-index: 20;
+            animation: fadeIn 0.3s;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 覆盖层：开始游戏 -->
+    <div id="start-overlay">
+        <h1>乾坤 · 龙藏</h1>
+        <button class="btn-start" onclick="startGame()">开始游戏</button>
+        <div class="btn-start-sub">（当前为单机版，Pi 登录以后再慢慢折腾）</div>
+    </div>
+
+    <!-- 游戏主体 -->
+    <div class="bagua-bg">☯</div>
+
+    <div id="top-bar">
+        <div id="header">乾坤 · 龙藏</div>
+        <button id="lang-btn" onclick="toggleLanguage()">🌐 中/EN</button>
+    </div>
+
+    <div id="ui-bar">
+        <div class="stat-item">
+            <span id="lbl-energy">气</span>
+            <span class="stat-val" id="energy">15</span>
+        </div>
+        <div id="destiny-box" onclick="rerollDestiny()">
+            <div style="font-size:10px;">本命 (Destiny)</div>
+            <div id="my-element" style="font-size:18px;">🔥 火</div>
+        </div>
+        <div class="stat-item">
+            <span id="lbl-balance">宝藏</span>
+            <span class="stat-val" id="balance" style="color:#f1c40f">0.00</span>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="message-box"></div>
+
+    <div id="controls">
+        <span id="username-display">单机模式</span> | 点击探索 · 五行生克
+    </div>
+
+    <script>
+        // 五行配置
+        const WUXING = {
+            Metal: { name: "金", color: "#f1c40f", icon: "⚪" },
+            Wood: { name: "木", color: "#2ecc71", icon: "🌲" },
+            Water: { name: "水", color: "#3498db", icon: "💧" },
+            Fire: { name: "火", color: "#e74c3c", icon: "🔥" },
+            Earth: { name: "土", color: "#d35400", icon: "⛰️" }
+        };
+        const ELEMENTS = ["Metal", "Wood", "Water", "Fire", "Earth"];
+
+        // 生克
+        const GENERATES = {
+            Metal: "Water",
+            Water: "Wood",
+            Wood: "Fire",
+            Fire: "Earth",
+            Earth: "Metal"
+        };
+        const DESTROYS = {
+            Metal: "Wood",
+            Wood: "Earth",
+            Earth: "Water",
+            Water: "Fire",
+            Fire: "Metal"
+        };
+
+        const LANG = {
+            zh: {
+                title: "乾坤 · 龙藏",
+                energy: "气",
+                balance: "宝藏",
+                msg_harmony: "【相生】气运加身！能量 +1",
+                msg_clash: "【相克】元气受损！能量 -2",
+                msg_empty: "此处是一片",
+                msg_scale: "【吉兆】发现龙鳞 (火)！+0.5 Pi",
+                msg_eye: "【天命】点亮龙眼！+5.0 Pi",
+                element_names: {
+                    Metal: "金地",
+                    Wood: "林地",
+                    Water: "水泽",
+                    Fire: "焦土",
+                    Earth: "荒原"
+                }
+            },
+            en: {
+                title: "Pi: Hidden Dragon",
+                energy: "Chi",
+                balance: "Treasure",
+                msg_harmony: "[Harmony] Energy +1",
+                msg_clash: "[Clash] Energy -2",
+                msg_empty: "You found",
+                msg_scale: "[Omen] Dragon Scale (Fire) +0.5 Pi",
+                msg_eye: "[Fate] Dragon Eye +5.0 Pi",
+                element_names: {
+                    Metal: "Metal Field",
+                    Wood: "Forest",
+                    Water: "Lake",
+                    Fire: "Ash Land",
+                    Earth: "Wasteland"
+                }
+            }
+        };
+
+        let currentLang = "zh";
+
+        // 龙头像素图 12x12
+        const DRAGON_MAP = [
+            [0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,0,0,0,0,0,0,1,0,0],
+            [0,0,1,1,0,0,0,0,1,1,0,0],
+            [0,1,1,1,1,1,1,1,1,1,1,0],
+            [0,1,1,2,1,1,1,1,2,1,1,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,0,0,1,1,1,1,0,0,1,1],
+            [0,1,1,1,1,0,0,1,1,1,1,0],
+            [0,0,1,1,1,0,0,1,1,1,0,0],
+            [0,0,1,0,1,0,0,1,0,1,0,0],
+            [0,0,1,0,0,0,0,0,0,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0]
+        ];
+
+        const CONFIG = {
+            gridSize: 12,
+            gap: 1,
+            tileSize: 0
+        };
+
+        let state = {
+            energy: 15,
+            balance: 0,
+            myElement: "Metal",
+            mapData: []
+        };
+
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const msgBox = document.getElementById("message-box");
+
+        // 简易音效
+        const AudioSys = {
+            ctx: null,
+            init() {
+                if (!this.ctx)
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.ctx.state === "suspended") this.ctx.resume();
+            },
+            beep(freq, type, dur) {
+                if (!this.ctx) this.init();
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.type = type;
+                o.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(
+                    0.01,
+                    this.ctx.currentTime + dur
+                );
+                o.connect(g);
+                g.connect(this.ctx.destination);
+                o.start();
+                o.stop(this.ctx.currentTime + dur);
+            }
+        };
+
+        // 点击“开始游戏”
+        function startGame() {
+            document.getElementById("start-overlay").style.display = "none";
+            initGame();
+        }
+
+        function initGame() {
+            const size =
+                Math.min(window.innerWidth, window.innerHeight) * 0.85;
+            canvas.width = size;
+            canvas.height = size;
+            CONFIG.tileSize =
+                (size - (CONFIG.gridSize + 1) * CONFIG.gap) / CONFIG.gridSize;
+
+            // 生成地图
+            state.mapData = [];
+            for (let r = 0; r < CONFIG.gridSize; r++) {
+                const row = [];
+                for (let c = 0; c < CONFIG.gridSize; c++) {
+                    const design = DRAGON_MAP[r][c];
+                    let type = "empty";
+                    let element =
+                        ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
+                    if (design === 1) {
+                        type = "scale";
+                        element = "Fire";
+                    } else if (design === 2) {
+                        type = "eye";
+                        element = "Metal";
+                    }
+                    row.push({ explored: false, type, element });
+                }
+                state.mapData.push(row);
+            }
+
+            rerollDestiny(true);
+            drawMap();
+            updateUI();
+
+            canvas.addEventListener("click", onCanvasClick);
+            document.body.addEventListener(
+                "click",
+                () => AudioSys.init(),
+                { once: true }
+            );
+        }
+
+        function onCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const col = Math.floor(
+                (e.clientX - rect.left) /
+                    (CONFIG.tileSize + CONFIG.gap)
+            );
+            const row = Math.floor(
+                (e.clientY - rect.top) /
+                    (CONFIG.tileSize + CONFIG.gap)
+            );
+            if (
+                col < 0 ||
+                col >= CONFIG.gridSize ||
+                row < 0 ||
+                row >= CONFIG.gridSize
+            )
+                return;
+            explore(row, col);
+        }
+
+        function explore(row, col) {
+            const cell = state.mapData[row][col];
+            if (cell.explored) return;
+            if (state.energy <= 0) {
+                showMessage(
+                    currentLang === "zh" ? "气数已尽，请等待。" : "No more Chi.",
+                    "#7f8c8d"
+                );
+                return;
+            }
+
+            const t = LANG[currentLang];
+            let feedback = "";
+            let color = "#fff";
+            const tileEl = cell.element;
+            const myEl = state.myElement;
+
+            // 基础扣 1 点
+            state.energy -= 1;
+
+            // 五行关系
+            if (GENERATES[tileEl] === myEl) {
+                // 生我
+                state.energy += 2;
+                feedback =
+                    t.msg_harmony +
+                    `<br>(${WUXING[tileEl].name} ➞ ${WUXING[myEl].name})`;
+                color = "#2ecc71";
+                AudioSys.beep(600, "sine", 0.2);
+            } else if (DESTROYS[tileEl] === myEl) {
+                // 克我
+                state.energy -= 1;
+                feedback =
+                    t.msg_clash +
+                    `<br>(${WUXING[tileEl].name} ⚔️ ${WUXING[myEl].name})`;
+                color = "#e74c3c";
+                AudioSys.beep(150, "sawtooth", 0.3);
+            }
+
+            cell.explored = true;
+
+            // 处理龙眼/龙鳞
+            if (cell.type === "eye") {
+                state.balance += 5;
+                feedback = t.msg_eye;
+                color = "#00b894";
+                AudioSys.beep(1200, "square", 0.4);
+            } else if (cell.type === "scale") {
+                state.balance += 0.5;
+                feedback = t.msg_scale;
+                color = "#f1c40f";
+                AudioSys.beep(880, "square", 0.2);
+            } else {
+                const name = t.element_names[tileEl];
+                feedback += `<br>${t.msg_empty} ${WUXING[tileEl].icon} ${name}`;
+            }
+
+            if (Math.random() > 0.9) {
+                setTimeout(() => rerollDestiny(false), 500);
+            }
+
+            drawMap();
+            updateUI();
+            showMessage(feedback, color, 2800);
+        }
+
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let r = 0; r < CONFIG.gridSize; r++) {
+                for (let c = 0; c < CONFIG.gridSize; c++) {
+                    const x =
+                        CONFIG.gap +
+                        c * (CONFIG.tileSize + CONFIG.gap);
+                    const y =
+                        CONFIG.gap +
+                        r * (CONFIG.tileSize + CONFIG.gap);
+                    const cell = state.mapData[r][c];
+
+                    if (!cell.explored) {
+                        ctx.fillStyle = "#222";
+                        ctx.fillRect(
+                            x,
+                            y,
+                            CONFIG.tileSize,
+                            CONFIG.tileSize
+                        );
+                        ctx.strokeStyle = "#333";
+                        ctx.strokeRect(
+                            x,
+                            y,
+                            CONFIG.tileSize,
+                            CONFIG.tileSize
+                        );
+                    } else {
+                        const elData = WUXING[cell.element];
+                        ctx.fillStyle = elData.color;
+                        ctx.globalAlpha = 0.8;
+                        ctx.fillRect(
+                            x,
+                            y,
+                            CONFIG.tileSize,
+                            CONFIG.tileSize
+                        );
+                        ctx.globalAlpha = 1.0;
+
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+
+                        if (cell.type === "scale") {
+                            ctx.fillStyle = "#c0392b";
+                            ctx.fillRect(
+                                x,
+                                y,
+                                CONFIG.tileSize,
+                                CONFIG.tileSize
+                            );
+                            ctx.fillStyle = "gold";
+                            ctx.font = "16px Arial";
+                            ctx.fillText(
+                                "🐲",
+                                x + CONFIG.tileSize / 2,
+                                y + CONFIG.tileSize / 2
+                            );
+                        } else if (cell.type === "eye") {
+                            ctx.fillStyle = "#16a085";
+                            ctx.fillRect(
+                                x,
+                                y,
+                                CONFIG.tileSize,
+                                CONFIG.tileSize
+                            );
+                            ctx.fillStyle = "white";
+                            ctx.font = "16px Arial";
+                            ctx.fillText(
+                                "👁️",
+                                x + CONFIG.tileSize / 2,
+                                y + CONFIG.tileSize / 2
+                            );
+                        } else {
+                            ctx.fillStyle = "#000";
+                            ctx.font = "10px Arial";
+                            ctx.fillText(
+                                elData.name,
+                                x + CONFIG.tileSize / 2,
+                                y + CONFIG.tileSize / 2
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        function rerollDestiny(initial = false) {
+            const keys = Object.keys(WUXING);
+            state.myElement = keys[Math.floor(Math.random() * keys.length)];
+            if (!initial && navigator.vibrate) navigator.vibrate([40]);
+            updateUI();
+        }
+
+        function updateUI() {
+            const myEl = WUXING[state.myElement];
+            const elBox = document.getElementById("destiny-box");
+            document.getElementById("my-element").innerText =
+                myEl.icon + " " + myEl.name;
+            elBox.style.borderColor = myEl.color;
+            elBox.style.color = myEl.color;
+
+            document.getElementById("energy").innerText = state.energy;
+            document.getElementById("balance").innerText =
+                state.balance.toFixed(2);
+
+            const t = LANG[currentLang];
+            document.getElementById("lbl-energy").innerText = t.energy;
+            document.getElementById("lbl-balance").innerText = t.balance;
+            document.getElementById("header").innerText = t.title;
+        }
+
+        function toggleLanguage() {
+            currentLang = currentLang === "zh" ? "en" : "zh";
+            updateUI();
+        }
+
+        let msgTimeout = null;
+        function showMessage(html, color, dur = 2600) {
+            msgBox.innerHTML = html;
+            msgBox.style.borderColor = color;
+            msgBox.style.display = "block";
+            if (msgTimeout) clearTimeout(msgTimeout);
+            msgTimeout = setTimeout(() => {
+                msgBox.style.display = "none";
+            }, dur);
         }
     </script>
 </body>
