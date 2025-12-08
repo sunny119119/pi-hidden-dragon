@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pi · 乾坤龙藏</title>
+    <title>Pi · 乾坤龙藏 (Debug)</title>
+    <!-- 引入 Pi SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <style>
         body { background-color: #0c0c0c; color: #dcdde1; font-family: 'Microsoft YaHei', sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; height: 100vh; user-select: none; }
+        
+        /* 加载层样式 */
         #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 999; display: flex; justify-content: center; align-items: center; flex-direction: column; color: #f1c40f; }
-        .btn-pi { border: 1px solid #f1c40f; background: #f1c40f; color: #000; padding: 10px 30px; font-size: 18px; border-radius: 8px; font-weight: bold; margin: 10px; cursor: pointer; }
+        .btn-pi { border: 1px solid #f1c40f; background: #f1c40f; color: #000; padding: 12px 30px; font-size: 18px; border-radius: 8px; font-weight: bold; margin: 10px; cursor: pointer; box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
         .btn-skip { border: 1px solid #555; background: transparent; color: #888; padding: 8px 20px; font-size: 14px; border-radius: 8px; margin-top: 20px; }
         
         /* 游戏原有样式 */
@@ -29,15 +32,16 @@
 </head>
 <body>
 
-    <!-- 加载与登录层 -->
+    <!-- 加载与登录层 (这里是重点) -->
     <div id="loading-overlay">
         <div style="margin-bottom: 20px; font-size: 24px;">乾坤 · 龙藏</div>
-        <div id="status-text" style="margin-bottom: 30px; font-size: 14px; color:#aaa;">准备就绪</div>
+        <div id="status-text" style="margin-bottom: 20px; font-size: 14px; color:#aaa; width:80%; text-align:center;">
+            准备就绪<br>点击下方黄色按钮登录
+        </div>
         
-        <!-- 手动点击登录，防止被拦截 -->
-        <button class="btn-pi" onclick="startPiLogin()">Login with Pi</button>
+        <!-- 这个按钮会触发调试弹窗 -->
+        <button class="btn-pi" onclick="startPiLogin()">Login with Pi (调试)</button>
         
-        <!-- 跳过按钮 -->
         <button class="btn-skip" onclick="skipLogin()">跳过登录 (单机版)</button>
     </div>
 
@@ -62,55 +66,41 @@
     <script>
         const Pi = window.Pi;
         
-        // 1. 手动触发登录函数
-               // --- 调试版登录函数 (开始) ---
+        // --- 核心登录逻辑 (带调试弹窗) ---
         async function startPiLogin() {
             const status = document.getElementById('status-text');
             
-            // 【第一步】弹窗显示当前真实网址
-            // Pi SDK 要求后台配置的 URL 必须和下面弹出的这个一模一样！
+            // 1. 获取当前真实网址
             const currentUrl = window.location.href;
-            alert("🔍 正在诊断...\n\n浏览器当前的真实网址是：\n" + currentUrl + "\n\n请检查：Pi后台填写的URL必须和上面这个完全一致(包括末尾斜杠)！");
+            
+            // 2. 弹窗显示，让你抄作业
+            alert("🔍【Pi 网址诊断】\n\n你的浏览器当前网址是：\n" + currentUrl + "\n\n请去 Pi 开发者后台(Configuration)，把 App URL 改成和上面完全一样！");
 
             try {
                 status.innerText = "正在初始化 SDK...";
                 Pi.init({ version: "2.0", sandbox: true });
                 
-                status.innerText = "正在呼叫 Pi 钱包...";
+                status.innerText = "正在请求授权...";
                 const scopes = ['username', 'payments'];
                 
                 // 开始认证
                 const auth = await Pi.authenticate(scopes, onIncompletePaymentFound);
                 
-                // 如果成功
-                status.innerText = "登录成功！";
+                // 成功！
+                status.innerText = "登录成功！欢迎 " + auth.user.username;
                 document.getElementById('username-display').innerText = `道友 @${auth.user.username}`;
                 
                 setTimeout(() => {
                     document.getElementById('loading-overlay').style.display = 'none';
                     init();
                     showMessage(`欢迎 @${auth.user.username}`, "#f1c40f");
-                }, 500);
+                }, 1000);
 
             } catch (err) {
                 console.error(err);
-                status.innerText = "错误: " + err;
-                // 如果报错，也会弹窗提示具体原因
-                alert("❌ 登录失败！错误信息：\n" + err);
-            }
-        }
-        // --- 调试版登录函数 (结束) ---
-                // 登录成功后进入游戏
-                setTimeout(() => {
-                    document.getElementById('loading-overlay').style.display = 'none';
-                    init();
-                    showMessage(`欢迎 @${auth.user.username}`, "#f1c40f");
-                }, 500);
-
-            } catch (err) {
-                console.error(err);
-                status.innerText = "登录失败: " + err;
-                alert("Pi 登录失败，请检查网址配置是否正确。\n错误信息: " + err);
+                status.innerText = "登录失败";
+                // 如果失败，再次弹窗显示具体错误
+                alert("❌ 登录被拒绝！\n可能原因：后台填写的 URL 和上面显示的真实 URL 不一致。\n\n错误信息: " + err);
             }
         }
 
@@ -122,7 +112,7 @@
             showMessage("单机演练模式", "#aaa");
         }
 
-        // --- 游戏核心逻辑 (保持不变) ---
+        // --- 游戏逻辑 (保持不变) ---
         const WUXING = {'Metal':{name:'金',color:'#f1c40f',icon:'⚪'},'Wood':{name:'木',color:'#2ecc71',icon:'🌲'},'Water':{name:'水',color:'#3498db',icon:'💧'},'Fire':{name:'火',color:'#e74c3c',icon:'🔥'},'Earth':{name:'土',color:'#d35400',icon:'⛰️'}};
         const ELEMENTS = ['Metal', 'Wood', 'Water', 'Fire', 'Earth'];
         const GENERATES = { 'Metal':'Water', 'Water':'Wood', 'Wood':'Fire', 'Fire':'Earth', 'Earth':'Metal' };
@@ -189,4 +179,3 @@
     </script>
 </body>
 </html>
-
